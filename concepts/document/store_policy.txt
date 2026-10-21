@@ -1,0 +1,9 @@
+Welcome to ShopEasy. We sell electronics, books, and home goods online. Our customer support team is available Monday to Friday, 9am to 6pm.
+
+Shipping: Orders are processed within 24 hours. Standard shipping takes 3-5 business days. Express shipping takes 1-2 business days and costs $15 extra.
+
+Returns and refunds: You can return any item within 30 days of delivery. Items must be unused and in original packaging. Refunds are issued to your original payment method within 5-7 business days after we receive the item.
+
+Warranty: All electronics come with a 1-year manufacturer warranty. The warranty covers defects but not accidental damage or water damage.
+
+Account security: Never share your password. We will never ask for your password by email or phone. Enable two-factor authentication in your account settings.
