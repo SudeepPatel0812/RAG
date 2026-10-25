@@ -1,0 +1,24 @@
+# LangChain core
+langchain-core
+langchain-text-splitters
+langchain-classic
+
+# Docling document loading and PDF processing
+langchain-docling
+docling-slim[format-pdf-docling,rapidocr]
+
+# PyTorch for Docling layout models
+torch
+torchvision
+
+# OpenAI models and embeddings
+langchain-openai
+
+# Chroma vector database
+langchain-chroma
+
+# PDF text extraction (optional alternative to Docling)
+pypdf
+# Extra loaders (TextLoader, PyPDFLoader, DirectoryLoader, WebBaseLoader)
+langchain-community
+beautifulsoup4
