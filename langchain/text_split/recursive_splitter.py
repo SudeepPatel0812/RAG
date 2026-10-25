@@ -1,3 +1,23 @@
+"""
+RecursiveCharacterTextSplitter: the default splitter for most RAG.
+
+What it does:
+    Tries separators from biggest to smallest: ["\n\n", "\n", " ", ""].
+    Splits on "\n\n" (paragraphs); any piece still > chunk_size is split
+    again on "\n" (lines), then " " (words), then "" (characters), and the
+    small pieces are merged back up to chunk_size.
+
+Example (chunk_size=25):
+    a 600-char paragraph -> too big -> no "\n" inside -> split on " "
+    -> words merged into ~25-char chunks, never cutting a word in half.
+
+Why it's the default: it keeps meaning together (paragraph > line > word)
+as much as the size limit allows.
+
+Parameters: chunk_size, chunk_overlap, separators (to change the list).
+Functions: split_text(text) -> list[str], split_documents(docs) -> list[Document]
+"""
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 text = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque dolor mi, pellentesque quis porttitor non, molestie nec mauris. Nunc eget elit nunc. Morbi ultricies posuere turpis, eget convallis purus laoreet ac. Maecenas sed pellentesque lacus. Sed blandit libero vel erat commodo, id tincidunt ligula faucibus. Quisque suscipit blandit orci, et ultrices enim euismod vel. Vestibulum et accumsan nisi. Sed auctor quam a neque hendrerit iaculis. Donec vitae luctus erat. Praesent ultricies dapibus tellus ut rhoncus. Donec lobortis tempus orci. Aliquam accumsan ac ex pulvinar aliquet. Aenean imperdiet feugiat purus, vitae blandit velit tempus nec.

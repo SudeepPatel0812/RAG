@@ -1,3 +1,25 @@
+"""
+Token-based splitting: measure chunk_size in TOKENS, not characters.
+
+What it does:
+    Same recursive algorithm, but length = number of tokens from a real
+    tokenizer instead of len(text).
+
+Why tokens:
+    Models have limits in tokens (an embedding model's max input, an LLM's
+    context window). Characters per token varies (~5 here: 223 chars = 46
+    tokens), so a character limit can still overflow a model. Use the
+    tokenizer of the model you embed with.
+
+Functions used:
+    AutoTokenizer.from_pretrained("nomic-ai/nomic-embed-text-v1.5")
+        -> downloads that model's tokenizer from Hugging Face (cached after once)
+    RecursiveCharacterTextSplitter.from_huggingface_tokenizer(tokenizer, chunk_size, chunk_overlap)
+    tokenizer.encode(text, add_special_tokens=False) -> token ids; len() = token count
+
+Alternatives: TokenTextSplitter / from_tiktoken_encoder (OpenAI tokenizers, needs tiktoken).
+"""
+
 from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 

@@ -1,3 +1,26 @@
+"""
+CharacterTextSplitter: split on ONE separator, then merge pieces up to chunk_size.
+
+What it does:
+    1. text.split(separator)   (default separator = "\n\n", i.e. paragraphs)
+    2. glue consecutive pieces together while the total stays <= chunk_size
+    3. a single piece bigger than chunk_size is kept as-is (too big!) with a
+       warning; it never cuts inside a piece.
+
+Parameters:
+    chunk_size     -> max characters per chunk (measured with len())
+    chunk_overlap  -> characters repeated from the previous chunk
+    separator      -> where it is allowed to cut
+    keep_separator -> keep "\n\n" in the chunks or drop it
+
+Functions used:
+    split_text(text)      -> list[str]
+    split_documents(docs) -> list[Document] (keeps metadata)
+
+Limit: only one separator, so a huge paragraph stays huge. That's why
+RecursiveCharacterTextSplitter exists.
+"""
+
 from langchain_text_splitters import CharacterTextSplitter
 
 text = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque dolor mi, pellentesque quis porttitor non, molestie nec mauris. Nunc eget elit nunc. Morbi ultricies posuere turpis, eget convallis purus laoreet ac. Maecenas sed pellentesque lacus. Sed blandit libero vel erat commodo, id tincidunt ligula faucibus. Quisque suscipit blandit orci, et ultrices enim euismod vel. Vestibulum et accumsan nisi. Sed auctor quam a neque hendrerit iaculis. Donec vitae luctus erat. Praesent ultricies dapibus tellus ut rhoncus. Donec lobortis tempus orci. Aliquam accumsan ac ex pulvinar aliquet. Aenean imperdiet feugiat purus, vitae blandit velit tempus nec.

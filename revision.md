@@ -165,3 +165,32 @@ Framework trade-off: faster to build and easy to swap components, but hides the 
 - Don't name your variables after API fields (`content` vs the message's `"content"` key).
 - `zip(a, b)` pairs two lists (stops silently at the shorter). `enumerate(xs, start=1)` gives (position, item). `xs[-1]` = last, `xs[:-1]` = all but the last.
 - File paths are relative to **where you run the command**, not where the script lives.
+
+---
+
+## 9. LangChain loaders and splitters (code: `langchain/`, theory in each file's docstring)
+
+**Loaders** turn any source into the same shape: `Document(page_content, metadata)`.
+
+| File | Class | One Document per | Note |
+|---|---|---|---|
+| `loaders/text_loader.py` | `TextLoader` | file | simplest |
+| `loaders/pypdf_loader.py` | `PyPDFLoader` | PDF page (`metadata["page"]`, 0-based) | text layer only, no tables/OCR |
+| `loaders/document_loader.py` | `DoclingLoader` | structure-aware chunk | layout models: tables, headings; slow + heavy |
+| `loaders/directory_loader.py` | `DirectoryLoader` | whatever `loader_cls` gives | glob a folder (3 PDFs → 39 pages) |
+| `loaders/web_loader.py` | `WebBaseLoader` | URL | HTML → BeautifulSoup text; noisy |
+
+**Splitters** are all one algorithm, "try the biggest separator first, merge pieces up to `chunk_size`". Only two things change: **which separators** and **how length is measured**.
+
+| File | Separators | Length | Use when |
+|---|---|---|---|
+| `text_split/length_splitter.py` (`CharacterTextSplitter`) | one (`"\n\n"`) | chars | simple; big paragraphs stay big |
+| `text_split/recursive_splitter.py` | `"\n\n"` → `"\n"` → `" "` → `""` | chars | the default |
+| `text_split/document_splitter.py` | recursive + `chunk_overlap` + `add_start_index` | chars | real pipelines (`split_documents` keeps metadata) |
+| `text_split/markdown_splitter.py` | `#`, `##`, `###` | none (by section) | structured docs; headings go into metadata |
+| `text_split/code_splitter.py` | `\nclass `, `\ndef `, ... | chars | source code |
+| `text_split/token_splitter.py` | recursive | **tokens** (model's tokenizer) | production: models limit tokens, not chars |
+
+- `split_text` → `list[str]` (metadata lost). `split_documents` → `list[Document]` (metadata kept → citations).
+- **Overlap** repeats the end of the previous chunk, so a fact on a boundary appears whole in one chunk. Cost: more embeddings and tokens.
+- Not covered yet: **semantic chunking** (split where the embedding meaning changes; `langchain-experimental`).
