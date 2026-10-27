@@ -1,3 +1,50 @@
+"""
+INDEXING: put documents into a vector store (Pinecone), run once / when docs change.
+
+What a vector store is:
+    A place that stores (id, vector, metadata) and answers "which stored
+    vectors are closest to this one?" fast. It replaces the list of vectors +
+    cosine loop + sorted()[:k] from concepts/search.py.
+
+Pipeline in this file:
+    dicts -> Document(page_content, metadata) -> embed (Ollama, 768 numbers)
+          -> upsert to Pinecone as (id, values, metadata)
+
+Two different "Pinecone" objects:
+    pinecone.Pinecone (client)  -> ADMIN: create/delete/list/describe indexes
+    PineconeVectorStore         -> LangChain side: add_documents, similarity_search
+    (langchain_pinecone.Pinecone is an OLD alias of PineconeVectorStore, not the client)
+
+Functions used:
+    load_dotenv()                     -> loads .env into env vars (returns bool, not the key)
+    os.getenv("PINECONE_API_KEY")     -> reads one env var
+    pc.has_index(name)                -> does the index exist?
+    pc.create_index(name, dimension, metric, spec)
+        dimension=768   -> MUST equal the embedding model's output size (nomic-embed-text)
+        metric="cosine" -> same similarity as concepts/cosine.py
+        spec=ServerlessSpec(cloud, region) -> Pinecone runs/scales it for you
+        Like CREATE TABLE: run once, the if-check makes the script re-runnable.
+    pc.Index(name)                    -> handle to an existing index (by NAME)
+    PineconeVectorStore(index, embedding) -> wraps index + embedding model
+    add_documents(documents, ids)     -> embeds every Document, then UPSERTS
+        upsert = insert, or overwrite if the id exists (INSERT ... ON CONFLICT DO UPDATE)
+        same ids  -> re-running keeps 5 records; no ids -> random UUIDs -> duplicates
+
+What Pinecone actually stores per record:
+    id: "doc_001"
+    values: [0.0176, 0.0148, -0.1819, ...]   768 numbers, used to FIND the record
+    metadata: {category, author, ..., "text": <page_content>}
+    Pinecone has no "document" field: LangChain saves page_content in
+    metadata["text"] (text_key="text") and rebuilds the Document on search.
+    The console shows metadata; the values are there (check with index.fetch).
+
+Gotchas:
+    - Eventual consistency: new vectors aren't searchable instantly (time.sleep).
+    - Upsert still re-embeds unchanged docs; at scale, hash content and skip unchanged.
+    - Chunked docs need ids like "doc_001#chunk0"; if a doc shrinks, old chunk ids
+      stay behind as orphans unless you delete them first.
+"""
+
 import os
 import time
 

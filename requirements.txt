@@ -1,3 +1,5 @@
+# Python 3.13 (langchain-pinecone doesn't support 3.14 yet)
+
 # LangChain core
 langchain-core
 langchain-text-splitters
@@ -6,6 +8,20 @@ langchain-classic
 # Docling document loading and PDF processing
 langchain-docling
 docling-slim[format-pdf-docling,rapidocr]
+
+# Local models via Ollama (embeddings: nomic-embed-text, chat: qwen3)
+ollama
+langchain-ollama
+
+# Pinecone vector database (client + LangChain wrapper)
+pinecone
+langchain-pinecone
+
+# .env loading (PINECONE_API_KEY)
+python-dotenv
+
+# Hugging Face tokenizer for token-based splitting (token_splitter.py)
+transformers
 
 # PyTorch for Docling layout models
 torch
@@ -19,6 +35,11 @@ langchain-chroma
 
 # PDF text extraction (optional alternative to Docling)
 pypdf
+
 # Extra loaders (TextLoader, PyPDFLoader, DirectoryLoader, WebBaseLoader)
 langchain-community
 beautifulsoup4
+
+# Retrievers: BM25 keyword search, self-query filter parsing
+rank-bm25
+lark
