@@ -39,6 +39,8 @@ load → chunk → embed → store (id, vector, metadata)    question → embed 
 | **Upsert + ids** | same id overwrites (`INSERT … ON CONFLICT DO UPDATE`) → re-runs don't duplicate. No ids → random UUIDs → duplicates. Re-chunking leaves old ids as **orphans**. |
 | **ANN index** | approximate nearest neighbour (HNSW…): fast at millions of vectors, trades exactness for speed. |
 | **Retriever** | search-only interface: `invoke(question) → [Document]`, settings fixed once. Library = vector store; helper with fixed instructions = retriever. Swappable, plugs into chains. |
+| **R → A → G** | **R**etrieve chunks → **A**ugment: put them in a prompt (`ChatPromptTemplate`: system rules + `{context}` + `{question}`; prefix each chunk with its source/timestamp so the LLM can cite) → **G**enerate: `llm.invoke(messages)`, `temperature=0`. Test with an unanswerable question → "I don't know". |
+| **Runnables / LCEL** | everything (retriever, prompt, llm, parser, functions) shares one interface: `invoke` / `batch` / `stream` → compose with `\|` like Unix pipes. RAG chain: `RunnableParallel({"context": retriever \| format_docs, "question": RunnablePassthrough()}) \| prompt \| llm \| StrOutputParser()`. `format_docs` turns `[Document]` into one labelled string for `{context}`. `.invoke()` returns, so print it. |
 | **Relevance score** | for cosine, LangChain's `score_threshold` uses `(raw + 1) / 2`, not raw cosine. `EmbeddingsFilter` uses **raw** cosine. |
 | **Eventual consistency** | new vectors aren't searchable instantly (like replica lag). |
 
@@ -115,6 +117,8 @@ Big documents: chunk → **many rows** → search the chunks; metadata ties each
 - Values from a DB/API can change type: Pinecone returns `54` as `54.0` → `int(...)` before `:02d`.
 - `No module named X` → wrong venv (prompt must show `(.venv)`, not `(.venv314)`); check `sys.executable`.
 - Read the **last line** of a traceback, then the first line in *my* file. File paths are relative to where I run the command.
+- `import x` runs x.py top to bottom: top-level code runs, `def`s wait to be called, and the `if __name__ == "__main__":` block runs **only when the file is started**, not imported. Put the work in `def main()` + `if __name__ == "__main__": main()` → importing is safe and others can still call `x.main()`.
+- `embed_query` = sync (blocks); `aembed_query` = async (`await`, for async apps like FastAPI). Customising a LangChain class → override **both**, or one path silently behaves differently.
 - Tutorials go out of date → check the installed signature: `help(fn)` / `inspect.signature(fn)`.
 
 **LangChain / Pinecone**
@@ -143,3 +147,4 @@ Big documents: chunk → **many rows** → search the chunks; metadata ties each
 | parent document | `langchain/retrievers/parent_document_retriever.py` |
 | self-query | `langchain/retrievers/self_query_retriever.py` |
 | YouTube chat (transcript, time chunks, filter) | `youtube-chat-rag/youtube-chat-rag.py` |
+| production version: modules, CLI, namespaces, stale cleanup, threshold, tests | `youtube-chat-rag/ytrag/__init__.py` (what changed and why) |

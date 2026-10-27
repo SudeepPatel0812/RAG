@@ -22,6 +22,13 @@ The flow:
        v
     short passages + timestamp + link (https://www.youtube.com/watch?v=...&t=275s)
 
+    ANSWERING (R -> A -> G, at the bottom of the file)
+    question -> retriever (MMR + filter, no compression)  -> 3 chunks          R: retrieval
+             -> format_docs: "(4:35) text..." per chunk
+             -> ChatPromptTemplate: system rules + {context} + {question}       A: augmentation
+             -> ChatOllama(temperature=0)                                       G: generation
+             -> "She says ... (4:35)" + source links
+
 Step by step:
     1. LOAD
        YouTubeTranscriptApi() -> create an OBJECT first (fetch is a method, it needs self)
@@ -63,8 +70,39 @@ Step by step:
        -> each 1000-char chunk becomes the 1-2 sentences that answer the question.
        reasoning=True makes qwen3 think for EACH of the k chunks: slower; False is fine here.
 
-Next: put the compressed passages + question into a prompt and answer with ChatOllama,
-citing the timestamps ("she says this at 4:35").
+    6. AUGMENT (the "A" in RAG): add the retrieved knowledge to the prompt
+       ChatPromptTemplate.from_messages([("system", rules), ("human", "Context: {context} Question: {question}")])
+           system -> the grounding rules: only the context, cite timestamps, say "I don't know"
+           {context}, {question} -> slots filled at run time: prompt.invoke({...}) -> messages
+       format_docs(docs) -> "(4:35) text" per chunk, so the LLM can CITE where a fact came from
+       Better than an f-string: reusable, keeps system/human roles separate, plugs into chains.
+
+    7. GENERATE (the "G"): answer_llm.invoke(messages) -> answer.content
+       temperature=0 -> least creative, sticks to the given facts
+       Test with a question the video does NOT cover: it should say "I don't know".
+
+    8. RUNNABLES / LCEL: the same R -> A -> G as one pipeline
+       main_chain = RunnableParallel({"context": retriever | format_docs,
+                                      "question": RunnablePassthrough()}) | prompt | llm | StrOutputParser()
+
+       question --RunnableParallel (both branches get the same input)--+
+           context : retriever | format_docs -> "(0:54) ...
+
+(10:50) ..."
+           question: RunnablePassthrough     -> the question unchanged
+       -> {"context": ..., "question": ...} -> prompt -> messages -> llm -> AIMessage
+       -> StrOutputParser -> plain string
+
+       Why runnables: everything (retriever, prompt, llm, parser, my functions) is a Runnable
+       with the SAME interface (invoke / batch / stream), so they compose with | like Unix pipes.
+           main_chain.invoke(q)         one answer
+           main_chain.batch([q1, q2])   many questions in parallel
+           main_chain.stream(q)         tokens as they're generated (chat UI)
+           LangSmith traces every step; swap any piece without touching the rest.
+       Plain functions in a | chain are wrapped automatically (RunnableLambda is optional).
+       Gotcha: .invoke() RETURNS the answer; print it, or it's computed and thrown away.
+       Trade-off: for 3 steps, manual code is easier to debug; chains pay off for
+       streaming, batching, swapping and tracing (agents / LangGraph build on them).
 """
 
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -79,6 +117,9 @@ from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
 
 # Get the transcript of the video
 # Document Loader
@@ -210,3 +251,56 @@ for i, doc in enumerate(contextual_compresson_retriever.invoke(question), start=
     # Pinecone returns every number as a float (54 -> 54.0), and {:02d} only accepts ints
     minutes, seconds = divmod(int(doc.metadata["start"]), 60)
     print(i, f"{minutes}:{seconds:02d}", doc.metadata["url"], "|", doc.page_content)
+
+
+# ---------- AUGMENTATION: put the retrieved chunks into a prompt ----------
+# (uses the plain MMR retriever: chunks are already small, compression isn't needed for answering)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "You answer questions about a YouTube video using ONLY the transcript excerpts in the context. "
+     "Each excerpt starts with its timestamp, like (4:35). Cite the timestamp of every fact you use. "
+     "If the answer is not in the context, say \"I don't know, the video doesn't cover that.\""),
+    ("human", "Context:\n{context}\n\nQuestion: {question}"),
+])
+
+
+def format_docs(docs):
+    # one excerpt per chunk, each prefixed with its timestamp so the LLM can cite it
+    parts = []
+    for doc in docs:
+        minutes, seconds = divmod(int(doc.metadata["start"]), 60)  # Pinecone returns floats
+        parts.append(f"({minutes}:{seconds:02d}) {doc.page_content}")
+    return "\n\n".join(parts)
+
+
+# ---------- GENERATION: the LLM writes the answer from that prompt ----------
+
+answer_llm = ChatOllama(model="qwen3:14b", reasoning=False, temperature=0.2)  # temperature=0: stick to the facts
+
+# for question in [
+#     "Does the speaker talk about why AI won't replace developers?",
+#     "What is the speaker's favourite food?",  # not in the video -> should say "I don't know"
+# ]:
+#     docs = retriever.invoke(question)                                   # R: retrieve
+#     messages = prompt.invoke({"context": format_docs(docs), "question": question})  # A: augment
+#     answer = answer_llm.invoke(messages)                                # G: generate
+
+#     print(f"\n== Q: {question} ==")
+#     print(answer.content)
+#     print("sources:", ", ".join(doc.metadata["url"] for doc in docs))
+
+# Runnables
+parallel_chain = RunnableParallel({
+    'context': retriever | RunnableLambda(format_docs),
+    'question': RunnablePassthrough()
+})
+
+parallel_chain.invoke( "Does the speaker talk about why AI won't replace developers?")
+
+parser = StrOutputParser()
+
+main_chain = parallel_chain | prompt | llm | parser
+
+answer = main_chain.invoke("What is the speaker's favourite food?")
+print(answer)
