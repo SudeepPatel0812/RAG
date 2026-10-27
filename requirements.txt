@@ -43,3 +43,6 @@ beautifulsoup4
 # Retrievers: BM25 keyword search, self-query filter parsing
 rank-bm25
 lark
+
+# YouTube transcripts (youtube-chat-rag)
+youtube-transcript-api
